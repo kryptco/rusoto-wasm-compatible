@@ -11,6 +11,7 @@ use std::collections::btree_map::Entry;
 use std::str;
 
 use hmac::{Hmac, Mac};
+
 use sha2::{Sha256, Digest};
 
 use rustc_serialize::hex::ToHex;
@@ -251,25 +252,34 @@ fn digest_payload(payload: &Option<Vec<u8>>) -> (String, usize) {
     (digest, len)
 }
 
-fn signature(string_to_sign: &str, signing_key: &hmac::SigningKey) -> String {
-    hmac::sign(signing_key, string_to_sign.as_bytes()).as_ref().to_hex().to_string()
+fn signature(string_to_sign: &str, signing_key: &[u8]) -> String {
+    let mut mac = Hmac::<Sha256>::new(signing_key).unwrap();
+    mac.input(string_to_sign.as_bytes());
+    mac.result().code().as_slice().to_hex().to_string()
 }
 
-fn signing_key(secret: &str, date: Tm, region: &str, service: &str) -> hmac::SigningKey {
-    let date_key = hmac::SigningKey::new(&digest::SHA256, format!("AWS4{}", secret).as_bytes());
-    let date_hmac = hmac::sign(&date_key,
-                               date.strftime("%Y%m%d").unwrap().to_string().as_bytes());
+fn signing_key(secret: &str, date: Tm, region: &str, service: &str) -> Vec<u8> {
+    let mut date_key = Hmac::<Sha256>::new(format!("AWS4{}", secret).as_bytes()).unwrap();
+    date_key.input(date.strftime("%Y%m%d").unwrap().to_string().as_bytes());
+    let date_key_result = date_key.result().code();
+    let date_hmac = date_key_result.as_slice();
 
-    let region_key = hmac::SigningKey::new(&digest::SHA256, date_hmac.as_ref());
-    let region_hmac = hmac::sign(&region_key, region.as_bytes());
+    let mut region_key = Hmac::<Sha256>::new(date_hmac.as_ref()).unwrap();
+    region_key.input(region.as_bytes());
+    let region_key_result = region_key.result().code();
+    let region_hmac = region_key_result.as_slice();
 
-    let service_key = hmac::SigningKey::new(&digest::SHA256, region_hmac.as_ref());
-    let service_hmac = hmac::sign(&service_key, service.as_bytes());
+    let mut service_key = Hmac::<Sha256>::new(region_hmac.as_ref()).unwrap();
+    service_key.input(service.as_bytes());
+    let service_key_result = service_key.result().code();
+    let service_hmac = service_key_result.as_slice();
 
-    let signing_key = hmac::SigningKey::new(&digest::SHA256, service_hmac.as_ref());
-    let signing_hmac = hmac::sign(&signing_key, b"aws4_request");
+    let mut signing_key = Hmac::<Sha256>::new(service_hmac.as_ref()).unwrap();
+    signing_key.input(b"aws4_request");
+    let signing_key_result = signing_key.result().code();
+    let signing_hmac = signing_key_result.as_slice().to_vec();
 
-    hmac::SigningKey::new(&digest::SHA256, signing_hmac.as_ref())
+    signing_hmac
 }
 
 /// Mark string as AWS4-HMAC-SHA256 hashed
