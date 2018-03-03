@@ -6,12 +6,13 @@
 //! If needed, the request will be re-issued to a temporary redirect endpoint.  This can happen with
 //! newly created S3 buckets not in us-standard/us-east-1.
 
-use std::ascii::AsciiExt;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::str;
 
-use ring::{digest, hmac};
+use hmac::{Hmac, Mac};
+use sha2::{Sha256, Digest};
+
 use rustc_serialize::hex::ToHex;
 use time::Tm;
 use time::now_utc;
@@ -408,8 +409,9 @@ fn encode_uri_strict(uri: &str) -> String {
 }
 
 fn to_hexdigest<T: AsRef<[u8]>>(t: T) -> String {
-    let h = digest::digest(&digest::SHA256, t.as_ref());
-    h.as_ref().to_hex().to_string()
+    let mut hasher = Sha256::default();
+    hasher.input(t.as_ref());
+    hasher.result().to_hex().to_string()
 }
 
 fn remove_scheme_from_custom_hostname(hostname: &str) -> String {

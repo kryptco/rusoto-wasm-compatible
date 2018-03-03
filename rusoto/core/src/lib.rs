@@ -45,7 +45,6 @@ extern crate hyper_native_tls;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate ring;
 extern crate rustc_serialize;
 pub extern crate rusoto_credential as credential;
 extern crate serde;
@@ -54,7 +53,8 @@ extern crate serde_derive;
 extern crate time;
 extern crate url;
 extern crate xml;
-
+extern crate hmac;
+extern crate sha2;
 pub mod param;
 pub mod region;
 pub mod request;
